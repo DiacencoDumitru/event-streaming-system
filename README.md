@@ -21,12 +21,17 @@ Many services need durable, replayable event delivery with independent consumer 
 
 ```mermaid
 flowchart LR
-    Producer["Producer"] --> Router["Topic / Partition Router"]
-    Router --> AppendLog["Append-Only Log"]
-    AppendLog --> Consumer["Consumer"]
-    Consumer --> OffsetStore["Offset Store"]
-    OffsetStore --> Replay["Replay / Resume"]
-    Replay --> Consumer
+    Producer["Producer"] --> Partitioner["Topic + Partition Key"]
+    Partitioner --> AppendLog["Append-Only Partition Log"]
+    AppendLog --> SegmentStore["Segment Files"]
+    SegmentStore --> ConsumerPoll["Consumer Poll"]
+    ConsumerPoll --> Process["Process Record"]
+    Process --> Ack{"Processed Successfully?"}
+    Ack -->|Yes| CommitOffset["Commit Offset"]
+    Ack -->|No| Retry["Retry / Reprocess"]
+    Retry --> ConsumerPoll
+    CommitOffset --> Replay["Replay from Stored Offset"]
+    Replay --> ConsumerPoll
 ```
 
 ## How it works (high level)
