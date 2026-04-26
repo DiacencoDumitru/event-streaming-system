@@ -17,15 +17,27 @@ Many services need durable, replayable event delivery with independent consumer 
 - File-based persistence for durable storage
 - Minimal core focused on educational clarity
 
-## Architecture Overview
+## Architecture
 
-`Producer -> Topic/Partition Router -> Append-Only Log -> Consumer (Offset Driven)`
+```mermaid
+flowchart LR
+    Producer["Producer"] --> Router["Topic / Partition Router"]
+    Router --> AppendLog["Append-Only Log"]
+    AppendLog --> Consumer["Consumer"]
+    Consumer --> OffsetStore["Offset Store"]
+    OffsetStore --> Replay["Replay / Resume"]
+    Replay --> Consumer
+```
 
-- Each topic has one or more partitions
-- Messages are appended sequentially to partition logs
-- Consumers read by `(topic, partition, offset)` and persist progress externally
+## How it works (high level)
 
-## How It Works
+- Producers publish records that are routed by topic and partition key.
+- Records are appended sequentially to partition logs on disk.
+- Consumers fetch records using current offsets.
+- Processed offsets are persisted for safe restart and replay.
+- Rewinded offsets allow deterministic reprocessing of historical events.
+
+## How It Works (Detailed)
 
 ### Append-Only Log Storage
 
