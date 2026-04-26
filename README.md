@@ -74,3 +74,12 @@ Benchmark results should be collected with fixed payload sizes, producer batch s
 - Add replication protocol for broker fault tolerance
 - Add consumer group rebalancing semantics
 - Add metrics endpoint for lag, throughput, and partition utilization
+
+## Benchmark Methodology
+
+For reproducible throughput and latency analysis, keep:
+
+- Fixed payload size and producer batching policy
+- Stable partition count per benchmark scenario
+- Separate producer-only and end-to-end measurements
+- Explicit reporting of disk type and flush policy
