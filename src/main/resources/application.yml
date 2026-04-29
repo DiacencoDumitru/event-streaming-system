@@ -1,0 +1,3 @@
+app:
+  storage:
+    root-dir: ${EVENT_STREAM_STORAGE_DIR:./data}
