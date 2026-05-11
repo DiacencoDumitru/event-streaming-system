@@ -1,11 +1,14 @@
 package com.example.eventstreamingsystem.service;
 
 import com.example.eventstreamingsystem.config.StorageProperties;
+import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class TopicService {
@@ -31,6 +34,21 @@ public class TopicService {
         }
     }
 
+    public List<TopicSummaryResponse> listTopics() {
+        if (!Files.isDirectory(topicsRoot)) {
+            return List.of();
+        }
+        try (var stream = Files.list(topicsRoot)) {
+            return stream
+                    .filter(Files::isDirectory)
+                    .map(dir -> new TopicSummaryResponse(dir.getFileName().toString(), countPartitionLogs(dir)))
+                    .sorted(Comparator.comparing(TopicSummaryResponse::name))
+                    .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to list topics", e);
+        }
+    }
+
     public Path partitionFile(String topic, int partition) {
         Path partitionPath = topicsRoot.resolve(topic).resolve(partitionFileName(partition));
         if (Files.notExists(partitionPath)) {
@@ -42,7 +60,11 @@ public class TopicService {
     public int selectPartition(String topic, String key) {
         Path topicDir = topicsRoot.resolve(topic);
         try (var stream = Files.list(topicDir)) {
-            int partitions = (int) stream.filter(path -> path.getFileName().toString().startsWith("partition-")).count();
+            int partitions = (int) stream
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .filter(this::isPartitionLogFile)
+                    .count();
             if (partitions == 0) {
                 throw new IllegalArgumentException("Topic has no partitions");
             }
@@ -53,6 +75,22 @@ public class TopicService {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to resolve topic partitions", e);
         }
+    }
+
+    private int countPartitionLogs(Path topicDir) {
+        try (var stream = Files.list(topicDir)) {
+            return (int) stream
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .filter(this::isPartitionLogFile)
+                    .count();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to count partitions", e);
+        }
+    }
+
+    private boolean isPartitionLogFile(String fileName) {
+        return fileName.startsWith("partition-") && fileName.endsWith(".log");
     }
 
     private String partitionFileName(int partition) {

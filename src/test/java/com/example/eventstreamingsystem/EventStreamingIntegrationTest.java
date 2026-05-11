@@ -4,6 +4,7 @@ import com.example.eventstreamingsystem.dto.CommitOffsetRequest;
 import com.example.eventstreamingsystem.dto.CreateTopicRequest;
 import com.example.eventstreamingsystem.dto.PollResponse;
 import com.example.eventstreamingsystem.dto.PublishEventRequest;
+import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
 import com.example.eventstreamingsystem.model.StoredEvent;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -22,10 +24,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class EventStreamingIntegrationTest {
@@ -70,6 +74,26 @@ class EventStreamingIntegrationTest {
                 Void.class
         );
         assertThat(createTopicResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<Void> createSecondTopicResponse = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest("events", 1),
+                Void.class
+        );
+        assertThat(createSecondTopicResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<List<TopicSummaryResponse>> listTopicsResponse = restTemplate.exchange(
+                baseUrl + "/api/topics",
+                HttpMethod.GET,
+                HttpEntity.EMPTY,
+                new ParameterizedTypeReference<>() {
+                }
+        );
+        assertThat(listTopicsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(listTopicsResponse.getBody())).hasSize(2);
+        assertThat(listTopicsResponse.getBody())
+                .extracting(TopicSummaryResponse::name, TopicSummaryResponse::partitions)
+                .containsExactly(tuple("events", 1), tuple("orders", 2));
 
         ResponseEntity<StoredEvent> publishResponse = restTemplate.postForEntity(
                 baseUrl + "/api/events",
