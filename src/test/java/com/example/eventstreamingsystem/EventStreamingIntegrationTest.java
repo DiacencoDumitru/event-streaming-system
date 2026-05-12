@@ -1,7 +1,10 @@
 package com.example.eventstreamingsystem;
 
 import com.example.eventstreamingsystem.dto.CommitOffsetRequest;
+import com.example.eventstreamingsystem.dto.ConsumerGroupsResponse;
+import com.example.eventstreamingsystem.dto.ConsumerLagResponse;
 import com.example.eventstreamingsystem.dto.CreateTopicRequest;
+import com.example.eventstreamingsystem.dto.PartitionLagResponse;
 import com.example.eventstreamingsystem.dto.PartitionStatsResponse;
 import com.example.eventstreamingsystem.dto.PollResponse;
 import com.example.eventstreamingsystem.dto.PublishEventRequest;
@@ -123,6 +126,39 @@ class EventStreamingIntegrationTest {
         );
         assertThat(missingTopicResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
+        ResponseEntity<Void> missingLagResponse = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/lag?groupId=group-a&topic=unknown-topic",
+                Void.class
+        );
+        assertThat(missingLagResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        ResponseEntity<ConsumerGroupsResponse> groupsBeforeCommit = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/groups",
+                ConsumerGroupsResponse.class
+        );
+        assertThat(groupsBeforeCommit.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(groupsBeforeCommit.getBody()).groupIds()).isEmpty();
+
+        ResponseEntity<ConsumerLagResponse> lagBeforeConsume = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/lag?groupId=group-a&topic=orders",
+                ConsumerLagResponse.class
+        );
+        assertThat(lagBeforeConsume.getStatusCode()).isEqualTo(HttpStatus.OK);
+        ConsumerLagResponse lagBefore = Objects.requireNonNull(lagBeforeConsume.getBody());
+        assertThat(lagBefore.groupId()).isEqualTo("group-a");
+        assertThat(lagBefore.topic()).isEqualTo("orders");
+        assertThat(lagBefore.partitions())
+                .extracting(
+                        PartitionLagResponse::partition,
+                        PartitionLagResponse::committedOffset,
+                        PartitionLagResponse::endOffsetInclusive,
+                        PartitionLagResponse::lag
+                )
+                .containsExactly(
+                        tuple(0, -1L, 0L, 1L),
+                        tuple(1, -1L, -1L, 0L)
+                );
+
         ResponseEntity<PollResponse> firstPollResponse = restTemplate.getForEntity(
                 baseUrl + "/api/consumers/poll?groupId=group-a&topic=orders&partition=0&maxRecords=10",
                 PollResponse.class
@@ -137,6 +173,30 @@ class EventStreamingIntegrationTest {
                 Void.class
         );
         assertThat(commitResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<ConsumerLagResponse> lagAfterCommit = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/lag?groupId=group-a&topic=orders",
+                ConsumerLagResponse.class
+        );
+        assertThat(lagAfterCommit.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(lagAfterCommit.getBody()).partitions())
+                .extracting(
+                        PartitionLagResponse::partition,
+                        PartitionLagResponse::committedOffset,
+                        PartitionLagResponse::endOffsetInclusive,
+                        PartitionLagResponse::lag
+                )
+                .containsExactly(
+                        tuple(0, 0L, 0L, 0L),
+                        tuple(1, -1L, -1L, 0L)
+                );
+
+        ResponseEntity<ConsumerGroupsResponse> groupsAfterCommit = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/groups",
+                ConsumerGroupsResponse.class
+        );
+        assertThat(groupsAfterCommit.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(groupsAfterCommit.getBody()).groupIds()).containsExactly("group-a");
 
         ResponseEntity<PollResponse> secondPollResponse = restTemplate.exchange(
                 baseUrl + "/api/consumers/poll?groupId=group-a&topic=orders&partition=0&maxRecords=10",
