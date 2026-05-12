@@ -65,4 +65,14 @@ public class EventStoreService {
             throw new IllegalStateException("Failed to read events", e);
         }
     }
+
+    public long eventCount(Path partitionFile) {
+        try {
+            return Files.readAllLines(partitionFile, StandardCharsets.UTF_8).stream()
+                    .filter(line -> !line.isBlank())
+                    .count();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to count events", e);
+        }
+    }
 }
