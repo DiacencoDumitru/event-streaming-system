@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 public class OffsetStoreService {
@@ -40,6 +43,22 @@ public class OffsetStoreService {
             Files.writeString(file, Long.toString(offset), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to commit offset", e);
+        }
+    }
+
+    public synchronized List<String> listGroupIds() {
+        if (!Files.isDirectory(offsetsRoot)) {
+            return List.of();
+        }
+        try (var stream = Files.list(offsetsRoot)) {
+            List<String> ids = new ArrayList<>();
+            stream.filter(Files::isDirectory)
+                    .map(p -> p.getFileName().toString())
+                    .forEach(ids::add);
+            ids.sort(Comparator.naturalOrder());
+            return List.copyOf(ids);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to list consumer groups", e);
         }
     }
 

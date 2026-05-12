@@ -1,11 +1,15 @@
 package com.example.eventstreamingsystem.controller;
 
 import com.example.eventstreamingsystem.dto.CommitOffsetRequest;
+import com.example.eventstreamingsystem.dto.ConsumerGroupsResponse;
+import com.example.eventstreamingsystem.dto.ConsumerLagResponse;
 import com.example.eventstreamingsystem.dto.PollResponse;
+import com.example.eventstreamingsystem.service.ConsumerObservabilityService;
 import com.example.eventstreamingsystem.service.ConsumerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @Validated
 @RestController
@@ -20,9 +25,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConsumerController {
 
     private final ConsumerService consumerService;
+    private final ConsumerObservabilityService consumerObservabilityService;
 
-    public ConsumerController(ConsumerService consumerService) {
+    public ConsumerController(
+            ConsumerService consumerService,
+            ConsumerObservabilityService consumerObservabilityService
+    ) {
         this.consumerService = consumerService;
+        this.consumerObservabilityService = consumerObservabilityService;
+    }
+
+    @GetMapping("/lag")
+    public ConsumerLagResponse lag(
+            @RequestParam @NotBlank String groupId,
+            @RequestParam @NotBlank String topic
+    ) {
+        return consumerObservabilityService.lag(groupId, topic)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @GetMapping("/groups")
+    public ConsumerGroupsResponse groups() {
+        return new ConsumerGroupsResponse(consumerObservabilityService.listGroupIds());
     }
 
     @GetMapping("/poll")

@@ -70,6 +70,18 @@ public class TopicService {
         return Optional.of(new TopicDetailResponse(name, partitionCount, List.copyOf(stats)));
     }
 
+    public Optional<Integer> topicPartitionCount(String topic) {
+        Path topicDir = topicsRoot.resolve(topic);
+        if (!Files.isDirectory(topicDir)) {
+            return Optional.empty();
+        }
+        int n = countPartitionLogs(topicDir);
+        if (n == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(n);
+    }
+
     public Path partitionFile(String topic, int partition) {
         Path partitionPath = topicsRoot.resolve(topic).resolve(partitionFileName(partition));
         if (Files.notExists(partitionPath)) {
