@@ -2,8 +2,10 @@ package com.example.eventstreamingsystem;
 
 import com.example.eventstreamingsystem.dto.CommitOffsetRequest;
 import com.example.eventstreamingsystem.dto.CreateTopicRequest;
+import com.example.eventstreamingsystem.dto.PartitionStatsResponse;
 import com.example.eventstreamingsystem.dto.PollResponse;
 import com.example.eventstreamingsystem.dto.PublishEventRequest;
+import com.example.eventstreamingsystem.dto.TopicDetailResponse;
 import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
 import com.example.eventstreamingsystem.model.StoredEvent;
 import org.junit.jupiter.api.AfterAll;
@@ -102,6 +104,24 @@ class EventStreamingIntegrationTest {
         );
         assertThat(publishResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(Objects.requireNonNull(publishResponse.getBody()).offset()).isZero();
+
+        ResponseEntity<TopicDetailResponse> topicDetailResponse = restTemplate.getForEntity(
+                baseUrl + "/api/topics/orders",
+                TopicDetailResponse.class
+        );
+        assertThat(topicDetailResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TopicDetailResponse detail = Objects.requireNonNull(topicDetailResponse.getBody());
+        assertThat(detail.name()).isEqualTo("orders");
+        assertThat(detail.partitions()).isEqualTo(2);
+        assertThat(detail.partitionStats())
+                .extracting(PartitionStatsResponse::partition, PartitionStatsResponse::eventCount)
+                .containsExactly(tuple(0, 1L), tuple(1, 0L));
+
+        ResponseEntity<Void> missingTopicResponse = restTemplate.getForEntity(
+                baseUrl + "/api/topics/unknown-topic",
+                Void.class
+        );
+        assertThat(missingTopicResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
         ResponseEntity<PollResponse> firstPollResponse = restTemplate.getForEntity(
                 baseUrl + "/api/consumers/poll?groupId=group-a&topic=orders&partition=0&maxRecords=10",

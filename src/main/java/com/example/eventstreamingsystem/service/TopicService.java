@@ -1,22 +1,28 @@
 package com.example.eventstreamingsystem.service;
 
 import com.example.eventstreamingsystem.config.StorageProperties;
+import com.example.eventstreamingsystem.dto.PartitionStatsResponse;
+import com.example.eventstreamingsystem.dto.TopicDetailResponse;
 import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class TopicService {
 
     private final Path topicsRoot;
+    private final EventStoreService eventStoreService;
 
-    public TopicService(StorageProperties properties) {
+    public TopicService(StorageProperties properties, EventStoreService eventStoreService) {
         this.topicsRoot = Path.of(properties.rootDir()).resolve("topics");
+        this.eventStoreService = eventStoreService;
     }
 
     public void createTopic(String topic, int partitions) {
@@ -47,6 +53,21 @@ public class TopicService {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to list topics", e);
         }
+    }
+
+    public Optional<TopicDetailResponse> findTopicDetail(String name) {
+        Path topicDir = topicsRoot.resolve(name);
+        if (!Files.isDirectory(topicDir)) {
+            return Optional.empty();
+        }
+        int partitionCount = countPartitionLogs(topicDir);
+        List<PartitionStatsResponse> stats = new ArrayList<>(partitionCount);
+        for (int i = 0; i < partitionCount; i++) {
+            Path file = topicDir.resolve(partitionFileName(i));
+            long count = Files.isRegularFile(file) ? eventStoreService.eventCount(file) : 0L;
+            stats.add(new PartitionStatsResponse(i, count));
+        }
+        return Optional.of(new TopicDetailResponse(name, partitionCount, List.copyOf(stats)));
     }
 
     public Path partitionFile(String topic, int partition) {
