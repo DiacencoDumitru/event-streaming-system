@@ -10,6 +10,7 @@ import com.example.eventstreamingsystem.dto.PollResponse;
 import com.example.eventstreamingsystem.dto.PublishBatchEventItem;
 import com.example.eventstreamingsystem.dto.PublishBatchRequest;
 import com.example.eventstreamingsystem.dto.PublishEventRequest;
+import com.example.eventstreamingsystem.dto.SeekOffsetRequest;
 import com.example.eventstreamingsystem.dto.TopicDetailResponse;
 import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
 import com.example.eventstreamingsystem.model.StoredEvent;
@@ -139,7 +140,7 @@ class EventStreamingIntegrationTest {
                 ConsumerGroupsResponse.class
         );
         assertThat(groupsBeforeCommit.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(Objects.requireNonNull(groupsBeforeCommit.getBody()).groupIds()).isEmpty();
+        assertThat(Objects.requireNonNull(groupsBeforeCommit.getBody()).groupIds()).doesNotContain("group-a");
 
         ResponseEntity<ConsumerLagResponse> lagBeforeConsume = restTemplate.getForEntity(
                 baseUrl + "/api/consumers/lag?groupId=group-a&topic=orders",
@@ -198,7 +199,7 @@ class EventStreamingIntegrationTest {
                 ConsumerGroupsResponse.class
         );
         assertThat(groupsAfterCommit.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(Objects.requireNonNull(groupsAfterCommit.getBody()).groupIds()).containsExactly("group-a");
+        assertThat(Objects.requireNonNull(groupsAfterCommit.getBody()).groupIds()).contains("group-a");
 
         ResponseEntity<PollResponse> secondPollResponse = restTemplate.exchange(
                 baseUrl + "/api/consumers/poll?groupId=group-a&topic=orders&partition=0&maxRecords=10",
@@ -327,5 +328,75 @@ class EventStreamingIntegrationTest {
         assertThat(body).hasSize(3);
         assertThat(body.stream().map(StoredEvent::offset).toList()).containsExactly(0L, 1L, 2L);
         assertThat(body.stream().map(StoredEvent::payload).toList()).containsExactly("a", "b", "c");
+    }
+
+    @Test
+    void shouldSeekBackwardAndReplayFromEarlierOffset() {
+        String baseUrl = "http://localhost:" + port;
+        String seekGroup = "sg" + UUID.randomUUID().toString().replace("-", "");
+        String seekTopic = "st" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+
+        ResponseEntity<Void> createTopic = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest(seekTopic, 1),
+                Void.class
+        );
+        assertThat(createTopic.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        restTemplate.postForEntity(
+                baseUrl + "/api/events",
+                new PublishEventRequest(seekTopic, "k", "m0"),
+                StoredEvent.class
+        );
+        restTemplate.postForEntity(
+                baseUrl + "/api/events",
+                new PublishEventRequest(seekTopic, "k", "m1"),
+                StoredEvent.class
+        );
+        restTemplate.postForEntity(
+                baseUrl + "/api/events",
+                new PublishEventRequest(seekTopic, "k", "m2"),
+                StoredEvent.class
+        );
+
+        ResponseEntity<PollResponse> firstPoll = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/poll?groupId=" + seekGroup + "&topic=" + seekTopic + "&partition=0&maxRecords=1",
+                PollResponse.class
+        );
+        assertThat(firstPoll.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(firstPoll.getBody()).records()).hasSize(1);
+        assertThat(firstPoll.getBody().records().getFirst().offset()).isZero();
+        assertThat(firstPoll.getBody().records().getFirst().payload()).isEqualTo("m0");
+
+        ResponseEntity<Void> commitFirst = restTemplate.postForEntity(
+                baseUrl + "/api/consumers/commit",
+                new CommitOffsetRequest(seekGroup, seekTopic, 0, 0),
+                Void.class
+        );
+        assertThat(commitFirst.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<PollResponse> secondPoll = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/poll?groupId=" + seekGroup + "&topic=" + seekTopic + "&partition=0&maxRecords=1",
+                PollResponse.class
+        );
+        assertThat(secondPoll.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(secondPoll.getBody()).records()).hasSize(1);
+        assertThat(secondPoll.getBody().records().getFirst().offset()).isEqualTo(1L);
+
+        ResponseEntity<Void> seek = restTemplate.postForEntity(
+                baseUrl + "/api/consumers/seek",
+                new SeekOffsetRequest(seekGroup, seekTopic, 0, 0),
+                Void.class
+        );
+        assertThat(seek.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<PollResponse> replayPoll = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/poll?groupId=" + seekGroup + "&topic=" + seekTopic + "&partition=0&maxRecords=10",
+                PollResponse.class
+        );
+        assertThat(replayPoll.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(Objects.requireNonNull(replayPoll.getBody()).records()).hasSize(3);
+        assertThat(replayPoll.getBody().records().getFirst().offset()).isZero();
+        assertThat(replayPoll.getBody().records().getFirst().payload()).isEqualTo("m0");
     }
 }

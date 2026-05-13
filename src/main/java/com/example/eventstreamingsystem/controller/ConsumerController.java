@@ -4,6 +4,7 @@ import com.example.eventstreamingsystem.dto.CommitOffsetRequest;
 import com.example.eventstreamingsystem.dto.ConsumerGroupsResponse;
 import com.example.eventstreamingsystem.dto.ConsumerLagResponse;
 import com.example.eventstreamingsystem.dto.PollResponse;
+import com.example.eventstreamingsystem.dto.SeekOffsetRequest;
 import com.example.eventstreamingsystem.exception.TopicNotFoundException;
 import com.example.eventstreamingsystem.service.ConsumerObservabilityService;
 import com.example.eventstreamingsystem.service.ConsumerService;
@@ -63,5 +64,10 @@ public class ConsumerController {
     @PostMapping("/commit")
     public void commit(@Valid @RequestBody CommitOffsetRequest request) {
         consumerService.commit(request.groupId(), request.topic(), request.partition(), request.offset());
+    }
+
+    @PostMapping("/seek")
+    public void seek(@Valid @RequestBody SeekOffsetRequest request) {
+        consumerService.seek(request.groupId(), request.topic(), request.partition(), request.nextOffset());
     }
 }

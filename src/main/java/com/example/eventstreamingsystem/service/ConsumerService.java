@@ -30,4 +30,9 @@ public class ConsumerService {
         topicService.partitionFile(topic, partition);
         offsetStoreService.commit(groupId, topic, partition, offset);
     }
+
+    public void seek(String groupId, String topic, int partition, long nextOffsetInclusive) {
+        topicService.partitionFile(topic, partition);
+        offsetStoreService.commit(groupId, topic, partition, nextOffsetInclusive - 1);
+    }
 }
