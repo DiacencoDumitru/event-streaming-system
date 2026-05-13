@@ -220,4 +220,23 @@ class EventStreamingIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(Objects.requireNonNull(response.getBody())).contains("\"code\":\"TOPIC_NOT_FOUND\"");
     }
+
+    @Test
+    void shouldRejectInvalidIdentifiers() {
+        String baseUrl = "http://localhost:" + port;
+
+        ResponseEntity<String> createTopicResponse = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest("../orders", 1),
+                String.class
+        );
+        assertThat(createTopicResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<String> lagResponse = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/lag?groupId=group/a&topic=orders",
+                String.class
+        );
+        assertThat(lagResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(Objects.requireNonNull(lagResponse.getBody())).contains("\"code\":\"VALIDATION_FAILED\"");
+    }
 }
