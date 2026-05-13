@@ -1,6 +1,7 @@
 package com.example.eventstreamingsystem.web;
 
 import com.example.eventstreamingsystem.exception.PartitionNotFoundException;
+import com.example.eventstreamingsystem.exception.TopicAlreadyExistsException;
 import com.example.eventstreamingsystem.exception.TopicNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -22,6 +23,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PartitionNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handlePartitionNotFound(PartitionNotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, "PARTITION_NOT_FOUND", ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(TopicAlreadyExistsException.class)
+    public ResponseEntity<ApiErrorResponse> handleTopicAlreadyExists(TopicAlreadyExistsException ex, HttpServletRequest request) {
+        return build(HttpStatus.CONFLICT, "TOPIC_ALREADY_EXISTS", ex.getMessage(), request.getRequestURI());
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
