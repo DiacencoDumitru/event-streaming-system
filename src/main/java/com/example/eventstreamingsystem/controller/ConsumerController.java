@@ -10,6 +10,7 @@ import com.example.eventstreamingsystem.service.ConsumerService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,8 +38,8 @@ public class ConsumerController {
 
     @GetMapping("/lag")
     public ConsumerLagResponse lag(
-            @RequestParam @NotBlank String groupId,
-            @RequestParam @NotBlank String topic
+            @RequestParam @NotBlank @Pattern(regexp = "^[a-zA-Z0-9._-]{1,128}$") String groupId,
+            @RequestParam @NotBlank @Pattern(regexp = "^[a-zA-Z0-9._-]{1,128}$") String topic
     ) {
         return consumerObservabilityService.lag(groupId, topic)
                 .orElseThrow(() -> new TopicNotFoundException(topic));
@@ -51,8 +52,8 @@ public class ConsumerController {
 
     @GetMapping("/poll")
     public PollResponse poll(
-            @RequestParam @NotBlank String groupId,
-            @RequestParam @NotBlank String topic,
+            @RequestParam @NotBlank @Pattern(regexp = "^[a-zA-Z0-9._-]{1,128}$") String groupId,
+            @RequestParam @NotBlank @Pattern(regexp = "^[a-zA-Z0-9._-]{1,128}$") String topic,
             @RequestParam @Min(0) int partition,
             @RequestParam(defaultValue = "100") @Min(1) int maxRecords
     ) {
