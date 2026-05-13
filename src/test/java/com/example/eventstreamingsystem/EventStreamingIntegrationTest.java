@@ -259,4 +259,36 @@ class EventStreamingIntegrationTest {
         assertThat(secondCreate.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(Objects.requireNonNull(secondCreate.getBody())).contains("\"code\":\"TOPIC_ALREADY_EXISTS\"");
     }
+
+    @Test
+    void shouldPublishManyEventsWithConsistentPartitionCounts() {
+        String baseUrl = "http://localhost:" + port;
+
+        ResponseEntity<Void> createTopic = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest("throughput", 4),
+                Void.class
+        );
+        assertThat(createTopic.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        int total = 120;
+        for (int i = 0; i < total; i++) {
+            ResponseEntity<StoredEvent> publishResponse = restTemplate.postForEntity(
+                    baseUrl + "/api/events",
+                    new PublishEventRequest("throughput", "k-" + i, "p-" + i),
+                    StoredEvent.class
+            );
+            assertThat(publishResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(Objects.requireNonNull(publishResponse.getBody()).offset()).isGreaterThanOrEqualTo(0L);
+        }
+
+        ResponseEntity<TopicDetailResponse> detailResponse = restTemplate.getForEntity(
+                baseUrl + "/api/topics/throughput",
+                TopicDetailResponse.class
+        );
+        assertThat(detailResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TopicDetailResponse detail = Objects.requireNonNull(detailResponse.getBody());
+        long sum = detail.partitionStats().stream().mapToLong(PartitionStatsResponse::eventCount).sum();
+        assertThat(sum).isEqualTo(total);
+    }
 }
