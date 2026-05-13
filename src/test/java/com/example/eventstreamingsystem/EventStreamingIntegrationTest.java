@@ -95,10 +95,10 @@ class EventStreamingIntegrationTest {
                 }
         );
         assertThat(listTopicsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(Objects.requireNonNull(listTopicsResponse.getBody())).hasSize(2);
+        assertThat(Objects.requireNonNull(listTopicsResponse.getBody())).hasSizeGreaterThanOrEqualTo(2);
         assertThat(listTopicsResponse.getBody())
                 .extracting(TopicSummaryResponse::name, TopicSummaryResponse::partitions)
-                .containsExactly(tuple("events", 1), tuple("orders", 2));
+                .contains(tuple("events", 1), tuple("orders", 2));
 
         ResponseEntity<StoredEvent> publishResponse = restTemplate.postForEntity(
                 baseUrl + "/api/events",
@@ -238,5 +238,25 @@ class EventStreamingIntegrationTest {
         );
         assertThat(lagResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(Objects.requireNonNull(lagResponse.getBody())).contains("\"code\":\"VALIDATION_FAILED\"");
+    }
+
+    @Test
+    void shouldReturnConflictWhenTopicAlreadyExists() {
+        String baseUrl = "http://localhost:" + port;
+
+        ResponseEntity<Void> firstCreate = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest("dup-topic", 2),
+                Void.class
+        );
+        assertThat(firstCreate.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<String> secondCreate = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest("dup-topic", 2),
+                String.class
+        );
+        assertThat(secondCreate.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(Objects.requireNonNull(secondCreate.getBody())).contains("\"code\":\"TOPIC_ALREADY_EXISTS\"");
     }
 }

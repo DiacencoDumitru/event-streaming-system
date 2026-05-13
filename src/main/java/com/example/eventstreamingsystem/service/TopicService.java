@@ -5,6 +5,7 @@ import com.example.eventstreamingsystem.dto.PartitionStatsResponse;
 import com.example.eventstreamingsystem.dto.TopicDetailResponse;
 import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
 import com.example.eventstreamingsystem.exception.PartitionNotFoundException;
+import com.example.eventstreamingsystem.exception.TopicAlreadyExistsException;
 import com.example.eventstreamingsystem.exception.TopicNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -30,12 +31,13 @@ public class TopicService {
     public void createTopic(String topic, int partitions) {
         try {
             Path topicDir = topicsRoot.resolve(topic);
+            if (Files.isDirectory(topicDir)) {
+                throw new TopicAlreadyExistsException(topic);
+            }
             Files.createDirectories(topicDir);
             for (int i = 0; i < partitions; i++) {
                 Path partitionFile = topicDir.resolve(partitionFileName(i));
-                if (Files.notExists(partitionFile)) {
-                    Files.createFile(partitionFile);
-                }
+                Files.createFile(partitionFile);
             }
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create topic " + topic, e);
