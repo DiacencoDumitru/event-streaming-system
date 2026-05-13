@@ -207,4 +207,17 @@ class EventStreamingIntegrationTest {
         assertThat(secondPollResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(Objects.requireNonNull(secondPollResponse.getBody()).records()).isEmpty();
     }
+
+    @Test
+    void shouldReturnDomainErrorBodyForMissingTopic() {
+        String baseUrl = "http://localhost:" + port;
+
+        ResponseEntity<String> response = restTemplate.getForEntity(
+                baseUrl + "/api/consumers/lag?groupId=group-a&topic=missing-topic",
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(Objects.requireNonNull(response.getBody())).contains("\"code\":\"TOPIC_NOT_FOUND\"");
+    }
 }

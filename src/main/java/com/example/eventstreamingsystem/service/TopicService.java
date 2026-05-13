@@ -4,6 +4,8 @@ import com.example.eventstreamingsystem.config.StorageProperties;
 import com.example.eventstreamingsystem.dto.PartitionStatsResponse;
 import com.example.eventstreamingsystem.dto.TopicDetailResponse;
 import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
+import com.example.eventstreamingsystem.exception.PartitionNotFoundException;
+import com.example.eventstreamingsystem.exception.TopicNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -83,15 +85,22 @@ public class TopicService {
     }
 
     public Path partitionFile(String topic, int partition) {
-        Path partitionPath = topicsRoot.resolve(topic).resolve(partitionFileName(partition));
+        Path topicDir = topicsRoot.resolve(topic);
+        if (Files.notExists(topicDir)) {
+            throw new TopicNotFoundException(topic);
+        }
+        Path partitionPath = topicDir.resolve(partitionFileName(partition));
         if (Files.notExists(partitionPath)) {
-            throw new IllegalArgumentException("Topic or partition does not exist");
+            throw new PartitionNotFoundException(topic, partition);
         }
         return partitionPath;
     }
 
     public int selectPartition(String topic, String key) {
         Path topicDir = topicsRoot.resolve(topic);
+        if (Files.notExists(topicDir)) {
+            throw new TopicNotFoundException(topic);
+        }
         try (var stream = Files.list(topicDir)) {
             int partitions = (int) stream
                     .filter(Files::isRegularFile)
@@ -99,7 +108,7 @@ public class TopicService {
                     .filter(this::isPartitionLogFile)
                     .count();
             if (partitions == 0) {
-                throw new IllegalArgumentException("Topic has no partitions");
+                throw new TopicNotFoundException(topic);
             }
             if (key == null || key.isBlank()) {
                 return 0;
