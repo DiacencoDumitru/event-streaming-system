@@ -1,5 +1,7 @@
 package com.example.eventstreamingsystem.controller;
 
+import com.example.eventstreamingsystem.dto.PublishBatchEventItem;
+import com.example.eventstreamingsystem.dto.PublishBatchRequest;
 import com.example.eventstreamingsystem.dto.PublishEventRequest;
 import com.example.eventstreamingsystem.model.StoredEvent;
 import com.example.eventstreamingsystem.service.ProducerService;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/events")
@@ -25,5 +29,11 @@ public class ProducerController {
     @ResponseStatus(HttpStatus.CREATED)
     public StoredEvent publish(@Valid @RequestBody PublishEventRequest request) {
         return producerService.publish(request.topic(), request.key(), request.payload());
+    }
+
+    @PostMapping("/batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<StoredEvent> publishBatch(@Valid @RequestBody PublishBatchRequest request) {
+        return producerService.publishBatch(request.topic(), request.events());
     }
 }

@@ -7,6 +7,8 @@ import com.example.eventstreamingsystem.dto.CreateTopicRequest;
 import com.example.eventstreamingsystem.dto.PartitionLagResponse;
 import com.example.eventstreamingsystem.dto.PartitionStatsResponse;
 import com.example.eventstreamingsystem.dto.PollResponse;
+import com.example.eventstreamingsystem.dto.PublishBatchEventItem;
+import com.example.eventstreamingsystem.dto.PublishBatchRequest;
 import com.example.eventstreamingsystem.dto.PublishEventRequest;
 import com.example.eventstreamingsystem.dto.TopicDetailResponse;
 import com.example.eventstreamingsystem.dto.TopicSummaryResponse;
@@ -290,5 +292,40 @@ class EventStreamingIntegrationTest {
         TopicDetailResponse detail = Objects.requireNonNull(detailResponse.getBody());
         long sum = detail.partitionStats().stream().mapToLong(PartitionStatsResponse::eventCount).sum();
         assertThat(sum).isEqualTo(total);
+    }
+
+    @Test
+    void shouldPublishBatchEventsInOrder() {
+        String baseUrl = "http://localhost:" + port;
+
+        ResponseEntity<Void> createTopic = restTemplate.postForEntity(
+                baseUrl + "/api/topics",
+                new CreateTopicRequest("batch-topic", 1),
+                Void.class
+        );
+        assertThat(createTopic.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        PublishBatchRequest batchRequest = new PublishBatchRequest(
+                "batch-topic",
+                List.of(
+                        new PublishBatchEventItem("same", "a"),
+                        new PublishBatchEventItem("same", "b"),
+                        new PublishBatchEventItem("same", "c")
+                )
+        );
+
+        ResponseEntity<List<StoredEvent>> batchResponse = restTemplate.exchange(
+                baseUrl + "/api/events/batch",
+                HttpMethod.POST,
+                new HttpEntity<>(batchRequest),
+                new ParameterizedTypeReference<>() {
+                }
+        );
+
+        assertThat(batchResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        List<StoredEvent> body = Objects.requireNonNull(batchResponse.getBody());
+        assertThat(body).hasSize(3);
+        assertThat(body.stream().map(StoredEvent::offset).toList()).containsExactly(0L, 1L, 2L);
+        assertThat(body.stream().map(StoredEvent::payload).toList()).containsExactly("a", "b", "c");
     }
 }
